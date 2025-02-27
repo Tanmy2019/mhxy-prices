@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>梦幻物价手册</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body { max-width: 800px; margin: 20px auto; padding: 20px; }
+    .editor { background: #f5f5f5; padding: 15px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    td, th { border: 1px solid #ddd; padding: 8px; }
+  </style>
+</head>
+<body>
+  <div class="editor">
+    <h2>添加新价格</h2>
+    <input type="text" id="itemName" placeholder="物品名称">
+    <input type="number" id="price" placeholder="价格">
+    <input type="text" id="server" placeholder="服务器">
+    <button onclick="savePrice()">保存记录</button>
+  </div>
+
+  <h2>价格列表</h2>
+  <table id="priceList">
+    <thead><tr><th>物品</th><th>价格</th><th>服务器</th><th>时间</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    // 配置 Supabase
+    const supabase = createClient(
+      'https://udfzockuzbaymlymweku.supabase.co', 
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkZnpvY2t1emJheW1seW13ZWt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2Njk0ODgsImV4cCI6MjA1NjI0NTQ4OH0.yqVND4x3jlrQV3OyfeC2bld_8fdWEMKnePHeL0WfNmo'
+    )
+
+    // 显示所有价格记录
+    async function loadPrices() {
+      const { data } = await supabase
+        .from('price_history')
+        .select(`
+          price,
+          server,
+          timestamp,
+          items (name)
+        `)
+        .order('timestamp', { ascending: false })
+
+      const tbody = document.querySelector('#priceList tbody')
+      tbody.innerHTML = data.map(item => `
+        <tr>
+          <td>${item.items.name}</td>
+          <td>${item.price}</td>
+          <td>${item.server}</td>
+          <td>${new Date(item.timestamp).toLocaleString()}</td>
+        </tr>
+      `).join('')
+    }
+
+    // 保存新价格
+    async function savePrice() {
+      const name = document.getElementById('itemName').value
+      const price = document.getElementById('price').value
+      const server = document.getElementById('server').value
+
+      // 第一步：查找或创建物品
+      let { data: item } = await supabase
+        .from('items')
+        .select('id')
+        .eq('name', name)
+        .single()
+
+      if (!item) {
+        const { data: newItem } = await supabase
+          .from('items')
+          .insert([{ name }])
+          .select()
+        item = newItem[0]
+      }
+
+      // 第二步：记录价格
+      await supabase
+        .from('price_history')
+        .insert([{ item_id: item.id, price, server }])
+
+      loadPrices() // 刷新列表
+    }
+
+    // 页面加载时加载数据
+    loadPrices()
+  </script>
+</body>
+</html>
